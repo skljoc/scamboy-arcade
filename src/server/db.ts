@@ -8,7 +8,9 @@ import { SCHEMA_SQL } from "./schema";
  * Neon integration sets — falling back to POSTGRES_URL. With neither set, the
  * online leaderboard is disabled and the console keeps scores in localStorage.
  */
-const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL || "";
+const connectionString = (process.env.DATABASE_URL || process.env.POSTGRES_URL || "")
+  // pg already treats these as verify-full; say so explicitly (silences pg's deprecation warning)
+  .replace(/sslmode=(prefer|require|verify-ca)\b/, "sslmode=verify-full");
 
 let pool: Pool | null = null;
 let schemaReady: Promise<void> | null = null;
