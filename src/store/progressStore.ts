@@ -12,6 +12,8 @@ export interface ScoreEntry {
 }
 
 export interface ProgressState {
+  /** anonymous id linking this device's scores in the online database */
+  playerId: string;
   nickname: string;
   highScores: Record<GameId, ScoreEntry[]>;
   completed: Record<GameId, boolean>;
@@ -31,6 +33,8 @@ export interface ProgressState {
   stats: Record<string, number>;
 
   setNickname: (name: string) => void;
+  /** returns this device's player id, creating it on first use */
+  ensurePlayerId: () => string;
   qualifies: (game: GameId, score: number) => boolean;
   addScore: (game: GameId, entry: ScoreEntry) => number;
   markCompleted: (game: GameId) => void;
@@ -50,6 +54,16 @@ export interface ProgressState {
 
 const MAX_SCORES = 10;
 
+/** crypto.randomUUID only exists in secure contexts; plain-http LAN testing needs a fallback */
+function uuidV4(): string {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
 const initial = () => ({
   nickname: "",
   highScores: { "street-rampage": [], "dirty-racing": [], "shell-game": [] } as Record<GameId, ScoreEntry[]>,
@@ -68,6 +82,15 @@ export const progressStore = createStore<ProgressState>()(
   persist(
     (set, get) => ({
       ...initial(),
+      playerId: "",
+      ensurePlayerId: () => {
+        let id = get().playerId;
+        if (!id) {
+          id = uuidV4();
+          set({ playerId: id });
+        }
+        return id;
+      },
       setNickname: (name) => set({ nickname: name.toUpperCase().slice(0, 8) }),
       qualifies: (game, score) => {
         if (score <= 0) return false;
@@ -108,6 +131,7 @@ export const progressStore = createStore<ProgressState>()(
       setShellBestLevel: (lvl) => set({ shellBestLevel: Math.max(get().shellBestLevel, lvl) }),
       setRampageBestStage: (stage) => set({ rampageBestStage: Math.max(get().rampageBestStage, stage) }),
       addStat: (key, n = 1) => set({ stats: { ...get().stats, [key]: (get().stats[key] ?? 0) + n } }),
+      // keeps playerId so online scores stay linked to this device
       resetAll: () => set({ ...initial() }),
     }),
     {
@@ -115,6 +139,7 @@ export const progressStore = createStore<ProgressState>()(
       version: 1,
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({
+        playerId: s.playerId,
         nickname: s.nickname,
         highScores: s.highScores,
         completed: s.completed,

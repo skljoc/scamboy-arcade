@@ -17,8 +17,29 @@ inside its 320×288 LCD:
 ```bash
 npm install
 npm run dev     # http://localhost:3000
-npm run build   # production build (Vercel-ready, fully static)
+npm run build   # production build (Vercel-ready)
 ```
+
+## Online leaderboard (Neon Postgres)
+
+Every finished run is uploaded to a world leaderboard (`/api/scores`) when a database is configured. Each
+browser gets an anonymous player id, so a player's scores stay linked to them; the world board shows every
+player's best run, with your own entry highlighted. Without a database the console keeps scores locally and
+the WORLD view simply shows "offline".
+
+**On Vercel:** import the repo, then add **Neon** from the project's *Storage* tab (Marketplace). It sets
+`DATABASE_URL` for you; the `scores` table is created automatically on the first request.
+
+**Locally:** copy `.env.example` to `.env.local`, set `DATABASE_URL` to any Postgres (a Neon branch or e.g.
+`docker run -p 5432:5432 -e POSTGRES_PASSWORD=pw postgres`), then optionally create the table up front:
+
+```bash
+npm run db:setup
+```
+
+Scores are validated server-side (known game, 1–8 character name, integer score within a per-game maximum,
+one submission per player every 3 s). Since scores come from the browser, treat the board as a fun arcade
+board rather than a tamper-proof one.
 
 ## Controls
 
@@ -51,6 +72,8 @@ src/
     street-rampage/       game 01
     dirty-racing/         game 02
     shell-game/           game 03
+  server/                 Postgres pool + score queries for the online leaderboard
+  app/api/scores/         GET world board / POST a finished run
   store/                  Zustand stores (console state, persisted progress & settings)
   lib/                    game metadata, achievements
 ```
